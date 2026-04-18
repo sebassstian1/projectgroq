@@ -5,7 +5,7 @@ from datetime import date
 from dotenv import load_dotenv
 import httpx, time, logging, os
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 app = Flask(__name__)
 CORS(app)
@@ -88,15 +88,25 @@ def summarize():
     data = request.json
     text = data.get("text", "")
     model = data.get("model", "llama-3.3-70b-versatile")
+    style = data.get("style", "brief")
     t0 = time.time()
+
+    style_instructions = {
+        "brief":    "Напиши краткое резюме в 3-5 предложениях. Только самое главное.",
+        "detailed": "Напиши подробный анализ: все ключевые идеи, факты, аргументы и выводы. Структурируй по разделам.",
+        "bullets":  "Оформи резюме в виде маркированного списка (буллеты). Каждый пункт — отдельная идея.",
+        "eli5":     "Объясни содержание текста простым языком, как будто читатель — школьник. Никакого жаргона.",
+    }
+    style_text = style_instructions.get(style, style_instructions["brief"])
 
     prompt = f"""Ты эксперт по анализу и извлечению смысла из текстов.
 
-Твоя задача — создать качественное резюме по следующим правилам:
+Стиль резюме: {style_text}
+
+Общие правила:
 - Сохрани все ключевые идеи, факты и выводы
 - Убери воду, повторения и второстепенные детали
-- Структурируй логически — от главного к деталям
-- Пиши чётко, ёмко, на русском языке
+- Пиши на русском языке
 - Если в тексте есть числа, даты или имена — обязательно сохрани их
 
 Текст для анализа:
@@ -117,7 +127,7 @@ def summarize():
             timeout=30
         )
         result = response.json()["choices"][0]["message"]["content"]
-        logging.info(f"пользователь: {user} | модель: {model} | символов: {len(text)} | время: {round(time.time() - t0, 2)}s | запросов сегодня: {daily_usage[user]['count']}/{DAILY_LIMIT}")
+        logging.info(f"пользователь: {user} | модель: {model} | стиль: {style} | символов: {len(text)} | время: {round(time.time() - t0, 2)}s | запросов сегодня: {daily_usage[user]['count']}/{DAILY_LIMIT}")
         return jsonify({"result": result})
 
     except Exception as e:
