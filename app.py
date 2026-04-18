@@ -6,7 +6,7 @@ import httpx, time, logging
 
 app = Flask(__name__)
 CORS(app)
-app.secret_key = "antropic"
+app.secret_key = os.environ.get("SECRET_KEY", "fallback_key_for_dev")
 
 GROQ_KEY = os.environ.get("GROQ_KEY")
 RECAPTCHA_SECRET = os.environ.get("RECAPTCHA_SECRET")
