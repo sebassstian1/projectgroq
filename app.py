@@ -2,7 +2,10 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from flask_cors import CORS
 from collections import defaultdict
 from datetime import date
-import httpx, time, logging
+from dotenv import load_dotenv
+import httpx, time, logging, os
+
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
