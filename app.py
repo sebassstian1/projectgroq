@@ -12,8 +12,8 @@ GROQ_KEY = os.environ.get("GROQ_KEY")
 RECAPTCHA_SECRET = os.environ.get("RECAPTCHA_SECRET")
 
 USERS = {
-    "admin": "napoleon123",
-    "friends": "kia2026"
+    os.environ.get("ADMIN_USER", "admin"): os.environ.get("ADMIN_PASS", ""),
+    os.environ.get("FRIEND_USER", "friend"): os.environ.get("FRIEND_PASS", "")
 }
 
 DAILY_LIMIT = 20
