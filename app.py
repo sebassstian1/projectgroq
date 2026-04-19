@@ -19,7 +19,7 @@ USERS = {
     os.environ.get("FRIEND_USER", "friend"): os.environ.get("FRIEND_PASS", "")
 }
 
-DAILY_LIMIT = 20
+DAILY_LIMIT = 30
 
 daily_usage = defaultdict(lambda: {"date": None, "count": 0})
 
@@ -135,4 +135,76 @@ def summarize():
         return jsonify({"result": f"Groq API вернул ошибку {e.response.status_code}. Попробуй позже."})
     except Exception as e:
         logging.error(f"ошибка: {str(e)}")
+        return jsonify({"result": "ОШИБКА: " + str(e)})
+
+
+@app.route("/translate", methods=["POST"])
+def translate():
+    if not session.get("logged_in"):
+        return jsonify({"result": "Нет доступа"}), 401
+
+    user = session.get("username", "admin")
+    today = str(date.today())
+
+    if daily_usage[user]["date"] != today:
+        daily_usage[user] = {"date": today, "count": 0}
+
+    if daily_usage[user]["count"] >= DAILY_LIMIT:
+        return jsonify({"result": f"Лимит {DAILY_LIMIT} запросов в день исчерпан. Возвращайся в Кыргыстан."})
+
+    data = request.json
+    text = data.get("text", "").strip()
+    direction = data.get("direction", "ru-en")
+
+    if not text:
+        return jsonify({"result": "Пустой текст."})
+
+    directions = {
+        "ru-en": ("русского", "английский"),
+        "en-ru": ("английского", "русский"),
+    }
+    if direction not in directions:
+        return jsonify({"result": "Неверное направление перевода."})
+
+    src, dst = directions[direction]
+    model = "llama-3.3-70b-versatile"
+    t0 = time.time()
+
+    prompt = f"""Ты профессиональный переводчик. Переведи текст с {src} на {dst}.
+
+Правила:
+- Сохрани смысл, стиль и тон оригинала
+- Сохрани форматирование (абзацы, списки, пунктуацию)
+- Технические термины передавай точно, а не дословно
+- Идиомы адаптируй под целевой язык
+- Не добавляй комментариев и пояснений — только перевод
+
+Текст:
+{text}"""
+
+    try:
+        response = httpx.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 2048
+            },
+            timeout=30
+        )
+        response.raise_for_status()
+        result = response.json()["choices"][0]["message"]["content"]
+        daily_usage[user]["count"] += 1
+        logging.info(f"пользователь: {user} | перевод: {direction} | символов: {len(text)} | время: {round(time.time() - t0, 2)}s | запросов сегодня: {daily_usage[user]['count']}/{DAILY_LIMIT}")
+        return jsonify({"result": result})
+
+    except httpx.HTTPStatusError as e:
+        logging.error(f"Groq HTTP {e.response.status_code}: {e.response.text[:200]}")
+        return jsonify({"result": f"Groq API вернул ошибку {e.response.status_code}. Попробуй позже."})
+    except Exception as e:
+        logging.error(f"ошибка перевода: {str(e)}")
         return jsonify({"result": "ОШИБКА: " + str(e)})
