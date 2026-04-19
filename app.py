@@ -83,8 +83,6 @@ def summarize():
     if daily_usage[user]["count"] >= DAILY_LIMIT:
         return jsonify({"result": f"Лимит {DAILY_LIMIT} запросов в день исчерпан. Возвращайся в Кыргыстан."})
 
-    daily_usage[user]["count"] += 1
-
     data = request.json
     text = data.get("text", "")
     model = data.get("model", "llama-3.3-70b-versatile")
@@ -126,10 +124,15 @@ def summarize():
             },
             timeout=30
         )
+        response.raise_for_status()
         result = response.json()["choices"][0]["message"]["content"]
+        daily_usage[user]["count"] += 1
         logging.info(f"пользователь: {user} | модель: {model} | стиль: {style} | символов: {len(text)} | время: {round(time.time() - t0, 2)}s | запросов сегодня: {daily_usage[user]['count']}/{DAILY_LIMIT}")
         return jsonify({"result": result})
 
+    except httpx.HTTPStatusError as e:
+        logging.error(f"Groq HTTP {e.response.status_code}: {e.response.text[:200]}")
+        return jsonify({"result": f"Groq API вернул ошибку {e.response.status_code}. Попробуй позже."})
     except Exception as e:
         logging.error(f"ошибка: {str(e)}")
         return jsonify({"result": "ОШИБКА: " + str(e)})
